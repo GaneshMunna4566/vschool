@@ -1,6 +1,5 @@
 import React from 'react'
 import '../../asstes/css/l_page.css'
-import cimg from '../../asstes/images/contact.jpg'
 
 function Landing() {
   return (
