@@ -1,0 +1,587 @@
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+import Navbar from '../homepages/Navbar'
+
+const CreateTaskForm = () => {
+  const [classId, setClassId] = useState('');
+  const [fileId, setFileId] = useState('');
+  const [fromTime, setFromTime] = useState('');
+  const [toTime, setToTime] = useState('');
+  const [comments, setComments] = useState('');
+  const [taskType, setTaskType] = useState('');
+  const [classList, setClassList] = useState([]);
+  const [fileList, setFileList] = useState([]);
+  const [tasks, setTasks] = useState([]);
+  const [selectedTask, setSelectedTask] = useState(null);
+  const [error, setError] = useState('');
+  const [userId, setUserId] = useState('');
+  const [userRole, setUserRole] = useState('');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const authToken = localStorage.getItem('authToken');
+        if (!authToken) {
+          setError('Token is missing or empty');
+          return;
+        }
+        const [classResponse, fileResponse, tasksResponse] = await Promise.all([
+          axios.get('http://localhost:5000/get-classes', { headers: { Authorization: `Bearer ${authToken}` } }),
+          axios.get('http://localhost:5000/uploaded-files', { headers: { Authorization: `Bearer ${authToken}` } }),
+          axios.get('http://localhost:5000/student-tasks', { headers: { Authorization: `Bearer ${authToken}` } }),
+        ]);
+
+        setClassList(classResponse.data.classes);
+        setFileList(fileResponse.data.uploaded_files);
+        setTasks(tasksResponse.data.tasks);
+      } catch (error) {
+        console.error('Error fetching data:', error.response ? error.response.data : error.message);
+      }
+    };
+    fetchData();
+  }, []);
+
+  const handleCreateTask = async () => {
+    try {
+      const authToken = localStorage.getItem('authToken');
+      if (!authToken) {
+        setError('Token is missing or empty');
+        return;
+      }
+      if (!classId) {
+        setError('Class ID is required');
+        return;
+      }
+      if (!taskType) {
+        setError('Task Type is required');
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('class_id', classId);
+      formData.append('file_id', fileId);
+      formData.append('from_time', fromTime);
+      formData.append('to_time', toTime);
+      formData.append('comments', comments);
+      formData.append('tasks_type', taskType);
+
+      const response = await axios.post('http://localhost:5000/create-task', formData, {
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+        },
+      });
+
+      console.log(response.data);
+    } catch (error) {
+      console.error('Error creating task:', error.response ? error.response.data : error.message);
+    }
+  };
+
+  const handleEditTask = (task) => {
+    setSelectedTask({ ...task, task_id: task.task_id });
+    setClassId(task.class_id);
+    setFileId(task.file_id);
+    setFromTime(new Date(task.from_time).toISOString().slice(0, 19).replace("T", " ")); // Convert to ISO format
+    setToTime(new Date(task.to_time).toISOString().slice(0, 19).replace("T", " ")); // Convert to ISO format
+    setComments(task.comments);
+    setTaskType(task.tasks_type);
+    setUserId(task.user_id || '');
+  };
+
+  const getFileNameById = (fileId) => {
+    const parsedFileId = parseInt(fileId, 10);
+
+    if (isNaN(parsedFileId)) {
+      return 'Invalid File ID';
+    }
+    const file = fileList.find((file) => file.id === parsedFileId);
+    return file ? file.filename : 'Unknown File';
+  };
+
+  const handleUpdateTask = async () => {
+    try {
+      const authToken = localStorage.getItem('authToken');
+      if (!authToken) {
+        setError('Token is missing or empty');
+        return;
+      }
+      if (!selectedTask) {
+        setError('No task selected for editing');
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('class_id', classId);
+      formData.append('file_id', fileId);
+      formData.append('from_time', fromTime);
+      formData.append('to_time', toTime);
+      formData.append('comments', comments);
+      formData.append('tasks_type', taskType);
+      formData.append('user_id', userId || selectedTask.user_id);
+
+      const apiUrl = `http://localhost:5000/edit-task/${userId || selectedTask.user_id}/${selectedTask.task_id}`;
+
+      const response = await axios.put(apiUrl, formData, {
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+        },
+      });
+
+      console.log(response.data);
+      setClassId('');
+      setFileId('');
+      setFromTime('');
+      setToTime('');
+      setComments('');
+      setTaskType('');
+      setUserId('');
+      setSelectedTask(null);
+    } catch (error) {
+      console.error('Error updating task:', error.response ? error.response.data : error.message);
+    }
+  };
+
+  const handleDeleteTask = async (taskId) => {
+    try {
+      const authToken = localStorage.getItem('authToken');
+      if (!authToken) {
+        setError('Token is missing or empty');
+        return;
+      }
+
+      const confirmDelete = window.confirm('Are you sure you want to delete this task?');
+      if (!confirmDelete) {
+        return;
+      }
+
+      const apiUrl = `http://localhost:5000/delete-task/${taskId}`;
+      const response = await axios.delete(apiUrl, {
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+        },
+      });
+
+      console.log(response.data);
+
+      // Update the tasks list after successful deletion
+      setTasks((prevTasks) => prevTasks.filter((task) => task.task_id !== taskId));
+    } catch (error) {
+      console.error('Error deleting task:', error.response ? error.response.data : error.message);
+    }
+  };
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const authToken = localStorage.getItem('authToken');
+        if (!authToken) {
+          setError('Token is missing or empty');
+          return;
+        }
+
+        const [classResponse, fileResponse, tasksResponse] = await Promise.all([
+          axios.get('http://localhost:5000/get-classes', { headers: { Authorization: `Bearer ${authToken}` } }),
+          axios.get('http://localhost:5000/uploaded-files', { headers: { Authorization: `Bearer ${authToken}` } }),
+          axios.get('http://localhost:5000/get-tasks', { headers: { Authorization: `Bearer ${authToken}` } }),
+        ]);
+
+        setClassList(classResponse.data.classes);
+        setFileList(fileResponse.data.uploaded_files);
+        setTasks(tasksResponse.data.tasks);
+        console.log("Fetched Classes:", classResponse.data.classes);
+        console.log("Fetched Files:", fileResponse.data.uploaded_files);
+        console.log("Fetched Tasks:", tasksResponse.data.tasks);
+        setLoading(false);
+      } catch (error) {
+        setError(error.response ? error.response.data : error.message);
+        setLoading(false);
+      }
+    };
+
+    const fetchUserRole = async () => {
+      try {
+        const authToken = localStorage.getItem('authToken');
+        if (!authToken) {
+          setError('Token is missing or empty');
+          return;
+        }
+
+        const response = await axios.get('http://localhost:5000/get-user-role', {
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
+        });
+
+        setUserRole(response.data.role);
+      } catch (error) {
+        setError(error.response ? error.response.data : error.message);
+      }
+    };
+
+    fetchData();
+    fetchUserRole();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      const authToken = localStorage.getItem('authToken');
+      if (!authToken) {
+        setError('Token is missing or empty');
+        return;
+      }
+
+      const response = await axios.get('http://localhost:5000/student-tasks', {
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+        },
+      });
+
+      setTasks(response.data.tasks);
+    } catch (error) {
+      console.error('Error fetching student tasks:', error.response ? error.response.data : error.message);
+    }
+  };
+
+  // Trigger the fetchData function in the useEffect hook
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  // Trigger the fetchData function in the useEffect hook
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  return (
+    <div class="main_box">
+      <Navbar />
+      {userRole === 'teacher' && (
+        <div class="container-xl" style={{ boxShadow: 'rgba(0, 0, 0, 0.35) 0px 5px 15px' }}>
+          <div class="table-responsive" style={{ maxHeight: '500px', overflowY: 'auto' }}>
+            <div class="table-wrapper">
+              <div class="table-title">
+                <div class="row">
+                  <div class="col-sm-6">
+                    <h2>
+                      Add <b>Task</b>
+                    </h2>
+                  </div>
+                  <div class="col-sm-6">
+                    <a href="#addEmployeeModal" class="btn btn-success" data-toggle="modal">
+                      <i class="material-icons">&#xE147;</i> <span>Add Task</span>
+                    </a>
+                  </div>
+                </div>
+              </div>
+              <table class="table table-striped table-hover">
+                <thead>
+                  <tr>
+                    <th></th>
+                    <th>Class</th>
+                    <th>File</th>
+                    <th>From_Time</th>
+                    <th>To_Time</th>
+                    <th>Comments</th>
+                    <th>Task_Type</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {tasks.map((task) => (
+                    <tr key={task.task_id}>
+                      <td>
+                        <span className="custom-checkbox">
+                          <input type="checkbox" id={`checkbox${task.task_id}`} name="options[]" value={task.task_id} />
+                          <label htmlFor={`checkbox${task.task_id}`}></label>
+                        </span>
+                      </td>
+                      <td>{task.class_id}</td>
+                      <td>{getFileNameById(task.file_id)}</td>
+                      <td>{task.from_time}</td>
+                      <td>{task.to_time}</td>
+                      <td>{task.comments}</td>
+                      <td>{task.tasks_type}</td>
+                      <td>
+                        <a href="#editTaskModal" className="edit" data-toggle="modal" onClick={() => handleEditTask(task)}>
+                          <i className="material-icons" data-toggle="tooltip" title="Edit">
+                            &#xE254;
+                          </i>
+                        </a>
+                        <a href="#" className="delete" onClick={() => handleDeleteTask(task.task_id)}>
+                          <i className="material-icons" data-toggle="tooltip" title="Delete">
+                            &#xE872;
+                          </i>
+                        </a>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div></div>
+            </div>
+          </div>
+        </div>
+      )}
+      <div id="addEmployeeModal" className="modal fade">
+        <div className="modal-dialog">
+          <div className="modal-content">
+            <form>
+              <div className="modal-body">
+                <div className="form-group">
+                  <label htmlFor="classId">
+                    Class ID:
+                    <select id="classId" className="form-control" value={classId} onChange={(e) => setClassId(e.target.value)}>
+                      <option value="">Select a class</option>
+                      {classList.map((cls) => (
+                        <option key={cls.id} value={cls.id}>
+                          {cls.class_name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                <div className="form-group">
+                  <label htmlFor="fileId">
+                    File ID:
+                    <select id="fileId" className="form-control" value={fileId} onChange={(e) => setFileId(e.target.value)}>
+                      <option value="">Select a file</option>
+                      {fileList.map((file) => (
+                        <option key={file.id} value={file.id}>
+                          {file.filename}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                <div className="form-group">
+                  <label htmlFor="fromTime">
+                    From Time:
+                    <input
+                      type="datetime-local"
+                      className="form-control"
+                      id="fromTime"
+                      value={fromTime}
+                      onChange={(e) => setFromTime(e.target.value)}
+                    />
+                  </label>
+                </div>
+                <div className="form-group">
+                  <label htmlFor="toTime">
+                    To Time:
+                    <input
+                      type="datetime-local"
+                      className="form-control"
+                      id="toTime"
+                      value={toTime}
+                      onChange={(e) => setToTime(e.target.value)}
+                    />
+                  </label>
+                </div>
+                <div className="form-group">
+                  <label htmlFor="comments">
+                    Comments:
+                    <input
+                      type="text"
+                      className="form-control"
+                      id="comments"
+                      value={comments}
+                      onChange={(e) => setComments(e.target.value)}
+                    />
+                  </label>
+                </div>
+                <div className="form-group">
+                  <label htmlFor="taskType">
+                    Task Type:
+                    <select id="taskType" className="form-control" value={taskType} onChange={(e) => setTaskType(e.target.value)}>
+                      <option value="">Select task type</option>
+                      <option value="Homework">Homework</option>
+                      <option value="Material">Material</option>
+                      <option value="Test">Test</option>
+                    </select>
+                  </label>
+                </div>
+                <button type="button" className="btn btn-success" onClick={handleCreateTask}>
+                  Create Task
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      {/* Edit Task Modal */}
+      <div id="editTaskModal" className="modal fade">
+        <div className="modal-dialog">
+          <div className="modal-content">
+            <form>
+              <div className="modal-body">
+                {selectedTask && (
+                  <div>
+                    <h4>Edit Task</h4>
+                    <div className="form-group">
+                      <label htmlFor="classId">
+                        Class ID:
+                        <select
+                          id="classId"
+                          className="form-control"
+                          value={classId || selectedTask.class_id}
+                          onChange={(e) => setClassId(e.target.value)}
+                        >
+                          <option value="">Select a class</option>
+                          {classList.map((cls) => (
+                            <option key={cls.id} value={cls.id}>
+                              {cls.class_name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
+                    <div className="form-group">
+                      <label htmlFor="fileId">
+                        File ID:
+                        <select
+                          id="fileId"
+                          className="form-control"
+                          value={fileId || selectedTask.file_id}
+                          onChange={(e) => setFileId(e.target.value)}
+                        >
+                          <option value="">Select a file</option>
+                          {fileList.map((file) => (
+                            <option key={file.id} value={file.id}>
+                              {file.filename}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
+                    <div className="form-group">
+                      <label htmlFor="fromTime">
+                        From Time:
+                        <input
+                          type="datetime-local"
+                          className="form-control"
+                          id="fromTime"
+                          value={fromTime || selectedTask.from_time}
+                          onChange={(e) => setFromTime(e.target.value)}
+                        />
+                      </label>
+                    </div>
+                    <div className="form-group">
+                      <label htmlFor="toTime">
+                        To Time:
+                        <input
+                          type="datetime-local"
+                          className="form-control"
+                          id="toTime"
+                          value={toTime || selectedTask.to_time}
+                          onChange={(e) => setToTime(e.target.value)}
+                        />
+                      </label>
+                    </div>
+                    <div className="form-group">
+                      <label htmlFor="comments">
+                        Comments:
+                        <input
+                          type="text"
+                          className="form-control"
+                          id="comments"
+                          value={comments || selectedTask.comments}
+                          onChange={(e) => setComments(e.target.value)}
+                        />
+                      </label>
+                    </div>
+                    <div className="form-group">
+                      <label htmlFor="comments">
+                        user_id:
+                        <input
+                          type="text"
+                          className="form-control"
+                          id="setUserId"
+                          value={userId || selectedTask.user_id}
+                          onChange={(e) => setUserId(e.target.value)}
+                          readOnly
+                        />
+                      </label>
+                    </div>
+                    <div className="form-group">
+                      <label htmlFor="taskType">
+                        Task Type:
+                        <select
+                          id="taskType"
+                          className="form-control"
+                          value={taskType || selectedTask.tasks_type}
+                          onChange={(e) => setTaskType(e.target.value)}
+                        >
+                          <option value="">Select task type</option>
+                          <option value="Homework">Homework</option>
+                          <option value="Material">Material</option>
+                          <option value="Test">Test</option>
+                        </select>
+                      </label>
+                    </div>
+                    <button type="button" className="btn btn-success" onClick={handleUpdateTask}>
+                      Update Task
+                    </button>
+                  </div>
+                )}
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+      <div>
+        {console.log('User Role:', userRole)}
+        {userRole === 'student' && (
+          <div className="container-xl" style={{ boxShadow: 'rgba(0, 0, 0, 0.35) 0px 5px 15px' }}>
+            <div className="table-responsive" style={{ maxHeight: '500px', overflowY: 'auto' }}>
+              {tasks.length === 0 ? (
+                <div>No tasks available</div>
+              ) : (
+                <div className="table-wrapper">
+                  <div className="table-title">
+                    <div className="row">
+                      <div className="col-sm-6">
+                        <h2>
+                          <b>Tasks</b>
+                        </h2>
+                      </div>
+                    </div>
+                  </div>
+                  <table className="table table-striped table-hover">
+                    <thead>
+                      <tr>
+                        <th></th>
+                        <th>Class</th>
+                        <th>File</th>
+
+                        <th>From_Time</th>
+                        <th>To_Time</th>
+                        <th>Comments</th>
+                        <th>Task_Type</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {tasks.map((task) => (
+                        <tr key={task.task_id}>
+                          <td>{task.class_id}</td>
+                          <td>{getFileNameById(task.file_id)}</td>
+                          <td>{task.from_time}</td>
+                          <td>{task.from_time}</td>
+                          <td>{task.to_time}</td>
+                          <td>{task.comments}</td>
+                          <td>{task.tasks_type}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <div></div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+    </div>
+  );
+};
+
+export default CreateTaskForm;
